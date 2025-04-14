@@ -27,6 +27,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        System.out.println("JwtAuthenticationFilter triggered 🚨");
+
 
         final String authHeader = request.getHeader("Authorization");
 
@@ -37,6 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String jwt = authHeader.substring(7); // Remove "Bearer "
         final String userEmail = jwtService.extractUsername(jwt);
+        System.out.println("JWT: " + jwt);
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
@@ -47,13 +50,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         null,
                         userDetails.getAuthorities()
                 );
-                System.out.println("JWT: " + jwt);
-                System.out.println("Username from token: " + userDetails.getUsername());
+                    System.out.println("Username from token: " + userDetails.getUsername());
                 System.out.println("User authenticated: " + (SecurityContextHolder.getContext().getAuthentication() != null));
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 // Set authentication
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                System.out.println("Authorities: " + userDetails.getAuthorities());
+
             }
         }
 
