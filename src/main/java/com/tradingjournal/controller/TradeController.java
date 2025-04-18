@@ -1,5 +1,7 @@
 package com.tradingjournal.controller;
 
+import com.tradingjournal.dto.TradeDTO;
+import com.tradingjournal.logic.AvgCostTradeMatcher.*;
 import com.tradingjournal.model.Trade;
 import com.tradingjournal.service.TradeService;
 import jakarta.validation.Valid;
@@ -7,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/trades")
@@ -19,6 +23,21 @@ public class TradeController {
     @PostMapping
     public ResponseEntity<Trade> createTrade(@Valid @RequestBody Trade trade) {
         return ResponseEntity.ok(tradeService.createTrade(trade));
+    }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<?> uploadTrades(@RequestBody List<TradeDTO> trades) {
+        tradeService.uploadTrades(trades);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/import-trades/{username}")
+    public ResponseEntity<?> importTrades(
+            @PathVariable String username,
+            @RequestBody List<TlgTradeDTO> trades
+    ) {
+        tradeService.importFromTlg(trades, username);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}")

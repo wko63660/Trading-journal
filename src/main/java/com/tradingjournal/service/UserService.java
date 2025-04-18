@@ -19,7 +19,12 @@ public class UserService {
 
     public User getUserById(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found witd id: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + id));
+    }
+
+    public User getUserByName(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with username: " + username));
     }
 
     public List<User> getAllUsers() {

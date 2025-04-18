@@ -17,6 +17,6 @@ public class Instrument {
     private String market;
     private String type;
 
-    @OneToMany(mappedBy = "instrument", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Trade> trades;
+//    @OneToMany(mappedBy = "instrument", cascade = CascadeType.ALL, orphanRemoval = true)
+//    private List<Trade> trades;
 }

@@ -30,14 +30,25 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole() != null ? request.getRole() : Role.USER)
                 .build();
+        User dbUser = userRepository.findByUsername(user.getUsername())
+                .orElseThrow(()-> new RuntimeException("Error occurs in register"));
 
         userRepository.save(user);
 
         String accessToken = jwtService.generateToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
+
+        AuthResponse.User newUser = AuthResponse.User.builder()
+                .username(dbUser.getUsername())
+                .email(dbUser.getEmail())
+                .role(String.valueOf(dbUser.getRole()))
+                .user_id(dbUser.getId())
+                .build();
+
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .user(newUser)
                 .build();
     }
 
@@ -55,9 +66,17 @@ public class AuthService {
         String accessToken = jwtService.generateToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
+        AuthResponse.User tmpUser = AuthResponse.User.builder()
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .role(String.valueOf(user.getRole()))
+                .user_id(user.getId())
+                .build();
+
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .user(tmpUser)
                 .build();
     }
 

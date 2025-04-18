@@ -1,5 +1,6 @@
 package com.tradingjournal.model;
 
+import com.tradingjournal.model.enums.TradeAction;
 import com.tradingjournal.model.enums.TradeSide;
 import com.tradingjournal.model.enums.TradeStatus;
 import com.tradingjournal.model.enums.TradeType;
@@ -23,10 +24,15 @@ public class Trade {
     private Long id;
 
 
-    @ManyToOne
+//    @ManyToOne
+//    @NotBlank(message = "Symbol is required")
+//    @JoinColumn(name = "instrument_symbol", referencedColumnName = "symbol", nullable = false)
+//    private Instrument instrument;
+
+
     @NotBlank(message = "Symbol is required")
-    @JoinColumn(name = "instrument_symbol", referencedColumnName = "symbol", nullable = false)
-    private Instrument instrument;
+    @Column(nullable = false)
+    private String symbol;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -37,14 +43,19 @@ public class Trade {
     @Column(nullable = false)
     private TradeType tradeType;
 
+    @NotNull(message = "Trade action is required")
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TradeAction tradeAction;
+
     @NotNull(message = "Trade side is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TradeSide side;
 
-    @NotNull(message = "Entry price is required")
+//    @NotNull(message = "Entry price is required")
     @Positive
-    @Column(nullable = false)
+//    @Column(nullable = false)
     private Double entryPrice;
 
     @Positive
@@ -53,6 +64,8 @@ public class Trade {
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
+
+    private Double pnl;
 
     @PastOrPresent
     @Column(nullable = false)
@@ -67,8 +80,8 @@ public class Trade {
 
     private String setup;
 
-    @OneToMany(mappedBy = "trade", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TradeNote> tradeNotes;
+    @Column(length = 2000)
+    private String tradeNote;
 
     private String screenshotUrl;
 

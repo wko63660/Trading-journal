@@ -4,4 +4,5 @@ public enum TradeType {
     OPTION,
     STOCK,
     FUTURE,
+    FOREX
 }
