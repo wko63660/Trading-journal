@@ -1,6 +1,6 @@
 package com.tradingjournal.service;
 
-import com.tradingjournal.controller.TlgTradeDTO;
+import com.tradingjournal.dto.TlgTradeDTO;
 import com.tradingjournal.dto.TradeDTO;
 import com.tradingjournal.logic.AvgCostTradeMatcher;
 import com.tradingjournal.logic.AvgCostTradeMatcher.*;
@@ -15,9 +15,8 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -34,29 +33,58 @@ public class TradeService {
     }
 
     public void importFromTlg(List<TlgTradeDTO> tlgList, String username) {
-        List<TradeRecord> rawRecords = tlgList.stream().map(dto ->
-                new TradeRecord(
-                        dto.symbol + ":" + dto.contract,
-                        dto.action,
-                        LocalDateTime.parse(dto.dateTime),
-                        dto.price,
-                        dto.qty
-                )
+        User user = userService.getUserByName(username);
+        //get open trades from db
+        List<Trade> dbOpenTrades = tradeRepository.findByStatusAndUserId(TradeStatus.OPEN, user.getId());
+        List<TradeRecord> dbRecords = dbOpenTrades.stream().map(trade -> TradeRecord.builder()
+                .symbol(trade.getSymbol())
+                .action(trade.getTradeAction().name())
+                .dateTime(trade.getEntryDateTime())
+                .price(trade.getEntryPrice())
+                .quantity(trade.getQuantity())
+                .position(trade.getPosition())
+                .original(null) // no TLG origin
+                .build()
         ).collect(Collectors.toList());
 
-        MatchResult result = AvgCostTradeMatcher.match(rawRecords);
-        User user   = userService.getUserByName(username);
+
+        List<TradeRecord> rawRecords = tlgList.stream()
+                .map(dto ->{
+                    LocalDateTime entry = (dto.entryDateTime != null && !dto.entryDateTime.isBlank())
+                            ? LocalDateTime.parse(dto.entryDateTime)
+                            : LocalDateTime.now();
+
+                    LocalDateTime exit = (dto.exitDateTime != null && !dto.exitDateTime.isBlank())
+                            ? LocalDateTime.parse(dto.exitDateTime)
+                            : null;
+                    return TradeRecord.builder()
+                            .symbol(dto.symbol + ":" + dto.contract)
+                            .action(dto.action)
+                            .dateTime(entry)
+                            .price(dto.price)
+                            .quantity(dto.qty)
+                            .position(dto.position)
+                            .original(dto)
+                            .build();}
+        ).collect(Collectors.toList());
+
+        List<TradeRecord> allRecords = new ArrayList<>();
+        allRecords.addAll(dbRecords);
+        allRecords.addAll(rawRecords);
+
+        MatchResult result = AvgCostTradeMatcher.match(allRecords);
         List<Trade> matchedTrades = result.completedTrades.stream().map(c ->
                 Trade.builder()
-                        .symbol(c.symbol.split(":" )[0])
-                        .entryPrice(c.entryPrice)
-                        .exitPrice(c.exitPrice)
-                        .entryDate(c.entryTime.toLocalDate())
-                        .entryTime(c.entryTime.toLocalTime())
-                        .exitDate(c.exitTime.toLocalDate())
-                        .exitTime(c.exitTime.toLocalTime())
-                        .quantity(c.quantity)
-                        .pnl(c.pnl)
+                        .symbol(c.getSymbol().split(":" )[0])
+                        .contract(c.getSymbol())
+                        .entryPrice(c.getEntryPrice())
+                        .exitPrice(c.getExitPrice())
+                        .entryDateTime(c.getEntryDateTime())
+                        .exitDateTime(c.getExitDateTime())
+                        .quantity(c.getQuantity())
+                        .volume(c.getVolume())
+                        .position(c.getPosition())
+                        .pnl(c.getPnl())
                         .status(TradeStatus.CLOSED)
                         .tradeAction(TradeAction.BUYTOOPEN) // default/fallback
                         .tradeType(TradeType.OPTION)
@@ -67,13 +95,15 @@ public class TradeService {
 
         List<Trade> openTrades = result.openPositions.stream().map(o ->
                 Trade.builder()
-                        .symbol(o.symbol.split(":" )[0])
-                        .entryPrice(o.price)
-                        .entryDate(o.dateTime.toLocalDate())
-                        .entryTime(o.dateTime.toLocalTime())
-                        .quantity(o.quantity)
+                        .symbol(o.getSymbol().split(":" )[0])
+                        .contract(o.getSymbol())
+                        .entryPrice(o.getPrice())
+                        .entryDateTime(o.getDateTime())
+                        .quantity(o.getQuantity())
+                        .position(o.getPosition())
+                        .volume(Math.abs(o.getPosition()))
                         .status(TradeStatus.OPEN)
-                        .tradeAction(TradeAction.valueOf(o.action))
+                        .tradeAction(TradeAction.valueOf(o.getAction()))
                         .tradeType(TradeType.OPTION)
                         .side(TradeSide.LONG)
                         .user(user)
@@ -93,15 +123,14 @@ public class TradeService {
             t.setSide(TradeSide.valueOf(dto.getSide().toUpperCase()));
             t.setTradeAction(TradeAction.valueOf(dto.getAction().toUpperCase()));
             t.setQuantity(dto.getQty());
-            if (!Objects.equals(dto.getEntryTime(), ""))
-                t.setEntryTime(LocalTime.parse(dto.getEntryTime()));
-            if (!Objects.equals(dto.getExitTime(), ""))
-                t.setExitTime(LocalTime.parse(dto.getExitTime()));
+            if (!Objects.equals(dto.getEntryDateTime(), ""))
+                t.setEntryDateTime(LocalDateTime.parse(dto.getEntryDateTime()));
+            if (!Objects.equals(dto.getExitDateTime(), ""))
+                t.setExitDateTime(LocalDateTime.parse(dto.getExitDateTime()));
             t.setEntryPrice(dto.getEntry());
             t.setExitPrice(dto.getExit());
             t.setTradeNote(dto.getNotes());
             t.setTags(dto.getTags());
-            t.setEntryDate(LocalDate.parse(dto.getDate())); // Optional: convert date
             t.setStatus(TradeStatus.valueOf(dto.getStatus().toUpperCase()));
             t.setTradeType(TradeType.valueOf(dto.getTradeType()));
             return t;
@@ -135,8 +164,7 @@ public class TradeService {
         existing.setTargetPrice(updatedTrade.getTargetPrice());
         existing.setSetup(updatedTrade.getSetup());
         existing.setTags(updatedTrade.getTags());
-        existing.setExitDate(updatedTrade.getExitDate());
-        existing.setExitTime(updatedTrade.getExitTime());
+        existing.setExitDateTime(updatedTrade.getExitDateTime());
         return tradeRepository.save(existing);
     }
 

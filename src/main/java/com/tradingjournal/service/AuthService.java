@@ -24,16 +24,21 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     public AuthResponse register(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Username already taken");
+        }
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole() != null ? request.getRole() : Role.USER)
                 .build();
-        User dbUser = userRepository.findByUsername(user.getUsername())
-                .orElseThrow(()-> new RuntimeException("Error occurs in register"));
+
 
         userRepository.save(user);
+
+        User dbUser = userRepository.findByUsername(user.getUsername())
+                .orElseThrow(()-> new RuntimeException("Error occurs in register"));
 
         String accessToken = jwtService.generateToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);

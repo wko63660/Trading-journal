@@ -10,13 +10,13 @@ import java.util.List;
 @AllArgsConstructor
 public class TradeDTO {
     private String symbol;
-    private String date;      // or LocalDate if parsed
+//    private String date;      // or LocalDate if parsed
     private String side;
     private String Status;
     private String action;
     private int qty;
-    private String entryTime;
-    private String exitTime;
+    private String entryDateTime;
+    private String exitDateTime;
     private double entry;
     private double exit;
     private double pnl;

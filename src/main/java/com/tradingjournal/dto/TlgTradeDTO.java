@@ -1,4 +1,4 @@
-package com.tradingjournal.controller;
+package com.tradingjournal.dto;
 
 public class TlgTradeDTO {
     public String symbol;
@@ -8,12 +8,12 @@ public class TlgTradeDTO {
     public String currency;
     public double fee;
     public String date;
-    public String entryTime;
-    public String exitTime;
-    public String dateTime;
+    public String entryDateTime;
+    public String exitDateTime;
     public String side;
     public String action;
     public int qty;
+    public int volume;
     public int position;
     public double cost;
     public String tradeType;

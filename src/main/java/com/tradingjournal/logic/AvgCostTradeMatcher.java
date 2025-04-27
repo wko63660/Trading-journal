@@ -1,44 +1,40 @@
 package com.tradingjournal.logic;
 
+import com.tradingjournal.dto.TlgTradeDTO;
+import lombok.Builder;
+import lombok.Data;
+
 import java.time.LocalDateTime;
 import java.util.*;
 
 public class AvgCostTradeMatcher {
 
+    @Data
+    @Builder
     public static class TradeRecord {
-        public String symbol;
-        public String action; // BUYTOOPEN, SELLTOCLOSE, etc.
-        public LocalDateTime dateTime;
-        public double price;
-        public int quantity;
-
-        public TradeRecord(String symbol, String action, LocalDateTime dateTime, double price, int quantity) {
-            this.symbol = symbol;
-            this.action = action;
-            this.dateTime = dateTime;
-            this.price = price;
-            this.quantity = quantity;
-        }
+        private String symbol;
+        private String action; // BUYTOOPEN, SELLTOCLOSE, etc.
+        private LocalDateTime dateTime;
+        private double price;
+        private int quantity;
+        private int position;
+        private int volume;
+        private TlgTradeDTO original;
     }
 
+    @Data
+    @Builder
     public static class CompletedTrade {
-        public String symbol;
-        public LocalDateTime entryTime;
-        public LocalDateTime exitTime;
-        public double entryPrice;
-        public double exitPrice;
-        public int quantity;
-        public double pnl;
-
-        public CompletedTrade(String symbol, LocalDateTime entryTime, LocalDateTime exitTime, double entryPrice, double exitPrice, int quantity, double pnl) {
-            this.symbol = symbol;
-            this.entryTime = entryTime;
-            this.exitTime = exitTime;
-            this.entryPrice = entryPrice;
-            this.exitPrice = exitPrice;
-            this.quantity = quantity;
-            this.pnl = pnl;
-        }
+        private String symbol;
+        private LocalDateTime entryDateTime;
+        private LocalDateTime exitDateTime;
+        private double entryPrice;
+        private double exitPrice;
+        private int volume;
+        private int position;
+        private int quantity;
+        private double pnl;
+        private TlgTradeDTO original;
     }
 
     public static class MatchResult {
@@ -51,84 +47,72 @@ public class AvgCostTradeMatcher {
         }
     }
 
-    public static class PositionTracker {
-        private double totalCost = 0.0;
-        private int totalQuantity = 0;
-        private final Queue<TradeRecord> entryQueue = new LinkedList<>();
-
-        public void addEntry(TradeRecord entry) {
-            totalCost += entry.price * entry.quantity;
-            totalQuantity += entry.quantity;
-            entryQueue.add(entry);
-        }
-
-        public List<CompletedTrade> closeOut(TradeRecord exit) {
-            List<CompletedTrade> completed = new ArrayList<>();
-            int qtyToClose = exit.quantity;
-            double avgEntryPrice = getAvgPrice();
-
-            while (qtyToClose > 0 && !entryQueue.isEmpty()) {
-                TradeRecord entry = entryQueue.peek();
-                int matchQty = Math.min(entry.quantity, qtyToClose);
-
-                double pnl = (exit.price - avgEntryPrice) * matchQty * 100; // Assume options
-
-                completed.add(new CompletedTrade(
-                        entry.symbol,
-                        entry.dateTime,
-                        exit.dateTime,
-                        avgEntryPrice,
-                        exit.price,
-                        matchQty,
-                        pnl
-                ));
-
-                // Update position
-                totalCost -= avgEntryPrice * matchQty;
-                totalQuantity -= matchQty;
-                entry.quantity -= matchQty;
-                qtyToClose -= matchQty;
-
-                if (entry.quantity == 0) {
-                    entryQueue.poll();
-                }
-            }
-
-            return completed;
-        }
-
-        public double getAvgPrice() {
-            return totalQuantity == 0 ? 0.0 : totalCost / totalQuantity;
-        }
-
-        public List<TradeRecord> getOpenPositions() {
-            return new ArrayList<>(entryQueue);
-        }
-    }
 
     public static MatchResult match(List<TradeRecord> records) {
-        List<CompletedTrade> results = new ArrayList<>();
-        Map<String, PositionTracker> trackers = new HashMap<>();
+        Map<String, Queue<TradeRecord>> openMap = new HashMap<>();
+        List<CompletedTrade> completed = new ArrayList<>();
 
         records.sort(Comparator.comparing(r -> r.dateTime));
 
         for (TradeRecord record : records) {
-            String key = record.symbol;
-            trackers.putIfAbsent(key, new PositionTracker());
-            PositionTracker tracker = trackers.get(key);
+            boolean isOption = record.original != null
+                    ? "OPTION".equalsIgnoreCase(record.original.tradeType)
+                    : true;
 
-            if (record.action.equals("BUYTOOPEN") || record.action.equals("SELLTOOPEN")) {
-                tracker.addEntry(record);
-            } else if (record.action.equals("BUYTOCLOSE") || record.action.equals("SELLTOCLOSE")) {
-                results.addAll(tracker.closeOut(record));
+            String key = record.original != null
+                    ? (isOption ? record.original.symbol + ":" + record.original.contract : record.original.symbol)
+                    :record.symbol;
+            record.symbol = key;
+
+            openMap.putIfAbsent(key, new LinkedList<>());
+
+            if (record.action.endsWith("OPEN")) {
+                openMap.get(key).add(record);
+            } else if (record.action.endsWith("CLOSE")) {
+                Queue<TradeRecord> queue = openMap.get(key);
+                int remainingToClose = record.quantity;
+
+                while (remainingToClose > 0 && queue != null && !queue.isEmpty()) {
+                    TradeRecord open = queue.peek();
+                    int matchedQty = Math.min(open.quantity, remainingToClose);
+                    double multiplier = isOption ? 100.0 : 1.0;
+                    double pnl = (record.price - open.price) * (double) matchedQty; // * multiplier -> temporarily disable
+
+                    LocalDateTime exitDateTime = record.original != null
+                            && record.original.exitDateTime != null
+                            && !record.original.exitDateTime.isBlank()
+                            ? LocalDateTime.parse(record.original.exitDateTime)
+                            : record.dateTime;
+
+                    completed.add(CompletedTrade.builder()
+                            .symbol(key)
+                            .entryDateTime(open.dateTime)
+                            .exitDateTime(exitDateTime)
+                            .entryPrice(open.price)
+                            .exitPrice(record.price)
+                            .volume(Math.abs(record.position)*2)
+                            .quantity(matchedQty)
+                            .pnl(pnl)
+                            .original(open.original)
+                            .build());
+
+                    open.quantity -= matchedQty;
+                    remainingToClose -= matchedQty;
+
+                    if (open.quantity == 0) {
+                        queue.poll();
+                    }
+                }
             }
         }
 
-        List<TradeRecord> remainingOpen = new ArrayList<>();
-        for (PositionTracker tracker : trackers.values()) {
-            remainingOpen.addAll(tracker.getOpenPositions());
+        List<TradeRecord> remaining = new ArrayList<>();
+        for (Queue<TradeRecord> queue : openMap.values()) {
+            remaining.addAll(queue);
         }
 
-        return new MatchResult(results, remainingOpen);
+        return new MatchResult(completed, remaining);
     }
+
+
 }

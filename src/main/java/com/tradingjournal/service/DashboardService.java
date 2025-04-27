@@ -41,15 +41,15 @@ public class DashboardService {
             boolean isWin = pnl > 0;
 
             // Day label
-            String dayLabel = trade.getEntryDate().getDayOfWeek().name().substring(0, 3);
+            String dayLabel = trade.getEntryDateTime().getDayOfWeek().name().substring(0, 3);
 
             dayStatsMap.computeIfPresent(dayLabel, (k, v) -> {
                 v.pnl += pnl;
                 v.trades += 1;
                 return v;
             });
-            if (trade.getExitDate() != null) {
-                Duration holding = Duration.between(trade.getEntryDate(), trade.getExitDate());
+            if (trade.getExitDateTime() != null) {
+                Duration holding = Duration.between(trade.getEntryDateTime(), trade.getExitDateTime());
                 totalHoldingDuration = totalHoldingDuration.plus(holding);
                 closedTrades++;
             }

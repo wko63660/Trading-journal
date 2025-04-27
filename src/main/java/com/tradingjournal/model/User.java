@@ -1,5 +1,6 @@
 package com.tradingjournal.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.tradingjournal.model.enums.Role;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -41,5 +42,6 @@ public class User {
     private String password;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Trade> trades;
 }

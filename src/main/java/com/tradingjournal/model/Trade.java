@@ -1,5 +1,6 @@
 package com.tradingjournal.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.tradingjournal.model.enums.TradeAction;
 import com.tradingjournal.model.enums.TradeSide;
 import com.tradingjournal.model.enums.TradeStatus;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -33,6 +35,8 @@ public class Trade {
     @NotBlank(message = "Symbol is required")
     @Column(nullable = false)
     private String symbol;
+
+    private String contract;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -65,18 +69,21 @@ public class Trade {
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
 
+    private Integer position;
+
+    private Integer volume;
+
+    private String exchange;
+
     private Double pnl;
 
     @PastOrPresent
     @Column(nullable = false)
-    private LocalDate entryDate;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime entryDateTime;
 
-    private LocalDate exitDate;
-
-    @Column(nullable = false)
-    private LocalTime entryTime;
-
-    private LocalTime exitTime;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime exitDateTime;
 
     private String setup;
 
